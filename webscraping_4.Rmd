@@ -1,0 +1,82 @@
+---
+title: "Webscraping IMBD Top 250 Films"
+output: html_notebook
+---
+
+```{r}
+library(rvest)
+library(tidyverse)
+
+url <- "https://www.imdb.com/chart/top/"
+new_top_movies <- read_html(url)
+```
+
+```{r}
+titles <- new_top_movies %>%
+  html_nodes("div.ipc-page-content-container.ipc-page-content-container--center.sc-383f2ac5-0.bfcGjo div.ipc-page-content-container.ipc-page-content-container--center section.ipc-page-background.ipc-page-background--base.sc-21815e1c-0.gMCjqH div div.ipc-page-grid.ipc-page-grid--bias-left div.sc-21815e1c-3.dIirTM.ipc-page-grid__item.ipc-page-grid__item--span-2 ul.ipc-metadata-list.ipc-metadata-list--dividers-between.sc-3f13560f-0.sTTRj.compact-list-view.ipc-metadata-list--base li.ipc-metadata-list-summary-item.sc-59b6048d-0.jemTre.cli-parent div.ipc-metadata-list-summary-item__c div.ipc-metadata-list-summary-item__tc div.sc-6fa21551-0.hyRLjF.cli-children div.ipc-title.ipc-title--base.ipc-title--title.ipc-title-link-no-icon.ipc-title--on-textPrimary.sc-6fa21551-9.dKJKsK.cli-title a.ipc-title-link-wrapper h3.ipc-title__text") %>%
+  html_text() %>% 
+  lapply(function(movies) {
+    unlist(movies[[1]])
+    }) %>% 
+  unlist()
+```
+
+```{r}
+date_time_rating <- new_top_movies %>% 
+  html_nodes("div.ipc-page-content-container.ipc-page-content-container--center.sc-383f2ac5-0.bfcGjo div.ipc-page-content-container.ipc-page-content-container--center section.ipc-page-background.ipc-page-background--base.sc-21815e1c-0.gMCjqH div div.ipc-page-grid.ipc-page-grid--bias-left div.sc-21815e1c-3.dIirTM.ipc-page-grid__item.ipc-page-grid__item--span-2 ul.ipc-metadata-list.ipc-metadata-list--dividers-between.sc-3f13560f-0.sTTRj.compact-list-view.ipc-metadata-list--base li.ipc-metadata-list-summary-item.sc-59b6048d-0.jemTre.cli-parent div.ipc-metadata-list-summary-item__c div.ipc-metadata-list-summary-item__tc div.sc-6fa21551-0.hyRLjF.cli-children div.sc-6fa21551-7.jLjTzn.cli-title-metadata span.sc-6fa21551-8.bnyjtW.cli-title-metadata-item") %>% 
+  html_text()
+```
+
+```{r}
+date <- na.omit(str_extract(date_time_rating, "\\b\\d{4}\\b"))
+```
+
+```{r}
+run_time <- na.omit(str_extract(date_time_rating,"\\b(?:\\d{1,3}[h]\\s*\\d{1,2}[m]|\\d{1,3}[h]|\\d{1,2}[m])\\b"))
+```
+
+```{r}
+rating <- new_top_movies %>% 
+  html_nodes("div.ipc-page-content-container.ipc-page-content-container--center.sc-383f2ac5-0.bfcGjo div.ipc-page-content-container.ipc-page-content-container--center section.ipc-page-background.ipc-page-background--base.sc-21815e1c-0.gMCjqH div div.ipc-page-grid.ipc-page-grid--bias-left div.sc-21815e1c-3.dIirTM.ipc-page-grid__item.ipc-page-grid__item--span-2 ul.ipc-metadata-list.ipc-metadata-list--dividers-between.sc-3f13560f-0.sTTRj.compact-list-view.ipc-metadata-list--base li.ipc-metadata-list-summary-item.sc-59b6048d-0.jemTre.cli-parent div.ipc-metadata-list-summary-item__c div.ipc-metadata-list-summary-item__tc div.sc-6fa21551-0.hyRLjF.cli-children span.sc-6fa21551-1.GNFYN div.sc-e3e7b191-0.iKUUVe.sc-6fa21551-2.kOfhdG.cli-ratings-container span.ipc-rating-star.ipc-rating-star--base.ipc-rating-star--imdb.ratingGroup--imdb-rating") %>% 
+  html_text()
+
+```
+
+```{r}
+viewers <- str_extract(rating, "(?<=\\().*?(?=\\))")
+```
+
+```{r}
+imbd_rating <- str_extract(rating, "\\b\\d\\.\\d\\b") %>% 
+  as.numeric()
+```
+
+```{r}
+imbd <- tibble(
+  Title = titles,
+  Release_Date = date, 
+  Run_Time = run_time,
+  Views = viewers, 
+  IMBD_Rating = imbd_rating
+)
+```
+
+```{r}
+ imbd %>% 
+  mutate(
+    Title = gsub("^\\d+\\.\\s+", "", Title),
+    Ranking = c(1:250)
+    ) %>% 
+  separate(Run_Time, into = c("Hours", "Minutes"), sep = " ") %>% 
+  mutate(Hours = substr(Hours, 1, nchar(Hours) - 1),
+    Hours = as.numeric(Hours)) %>% 
+  mutate(Minutes = substr(Minutes, 1, nchar(Minutes) - 1),
+    Minutes = as.numeric(Minutes)) %>% 
+  mutate(T_M = substr(Views, nchar(Views), nchar(Views)),
+    Views = substr(Views, 1, nchar(Views) - 1), Views = as.numeric(Views)) %>% 
+  select(Ranking, Title, Release_Date, Hours, Minutes, Views, T_M, IMBD_Rating)
+```
+
+
+
+
